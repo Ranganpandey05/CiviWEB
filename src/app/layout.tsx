@@ -1,0 +1,26 @@
+import { Inter } from 'next/font/google'
+import { AuthProvider } from '@/contexts/AuthContext'
+import './globals.css'
+
+const inter = Inter({ subsets: ['latin'] })
+
+export const metadata = {
+  title: 'CiviSamadhan - Digital Civic Management Platform',
+  description: 'Advanced civic issue management and resolution platform for smart cities',
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body className={inter.className}>
+        <AuthProvider>
+          {children}
+        </AuthProvider>
+      </body>
+    </html>
+  )
+}

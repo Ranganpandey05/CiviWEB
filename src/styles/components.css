@@ -1,0 +1,85 @@
+/***********************************************
+ * Component-specific styles for the civic 
+ * admin dashboard. This file includes styles 
+ * for various components used in the application.
+ ***********************************************/
+
+/* Dashboard styles */
+.dashboard {
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+}
+
+/* Reports styles */
+.reports-list {
+    margin: 20px 0;
+}
+
+.report-item {
+    border: 1px solid #ccc;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+}
+
+.report-filters {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+/* Workers styles */
+.workers-list {
+    margin: 20px 0;
+}
+
+.worker-item {
+    border: 1px solid #ccc;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+}
+
+/* Common styles */
+.loading-spinner {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background: white;
+    padding: 20px;
+    border-radius: 5px;
+    width: 400px;
+}
+
+/* Header and Sidebar styles */
+.header {
+    background: #007bff;
+    color: white;
+    padding: 10px;
+    text-align: center;
+}
+
+.sidebar {
+    width: 250px;
+    background: #f8f9fa;
+    padding: 15px;
+    position: fixed;
+    height: 100%;
+}
