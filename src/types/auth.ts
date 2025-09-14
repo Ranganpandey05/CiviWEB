@@ -2,6 +2,8 @@ export interface User {
   id: string
   email: string
   role: 'admin' | 'manager'
+  full_name?: string
+  username?: string
   created_at: string
   updated_at: string
 }

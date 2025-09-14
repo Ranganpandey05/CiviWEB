@@ -1,0 +1,122 @@
+/*!*************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[14].oneOf[10].use[2]!./node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[14].oneOf[10].use[3]!./src/styles/layout-fixes.css ***!
+  \*************************************************************************************************************************************************************************************************************************************************************************/
+/* Layout Fixes for CiviSamadhan Admin Dashboard */
+
+/* Ensure no horizontal scrolling issues */
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+/* Header positioning */
+.admin-header {
+  height: 4rem; /* 64px */
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+/* Layout container */
+.admin-layout {
+  display: flex;
+  height: calc(100vh - 4rem); /* Full height minus header */
+  overflow: hidden;
+}
+
+/* Sidebar styles */
+.admin-sidebar {
+  width: 16rem; /* 256px - w-64 */
+  height: 100%;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+/* Main content area */
+.admin-main {
+  flex: 1;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 1024px) {
+  .admin-sidebar {
+    position: fixed;
+    top: 4rem;
+    left: 0;
+    height: calc(100vh - 4rem);
+    z-index: 40;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease-in-out;
+  }
+  
+  .admin-sidebar.open {
+    transform: translateX(0);
+  }
+  
+  .admin-main {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
+/* Scrollbar styling */
+.admin-sidebar::-webkit-scrollbar,
+.admin-main::-webkit-scrollbar {
+  width: 6px;
+}
+
+.admin-sidebar::-webkit-scrollbar-track,
+.admin-main::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.admin-sidebar::-webkit-scrollbar-thumb,
+.admin-main::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.admin-sidebar::-webkit-scrollbar-thumb:hover,
+.admin-main::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Fix for tables and wide content */
+.table-container {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+/* Report cards responsiveness */
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+  width: 100%;
+}
+
+/* Mobile overlay */
+.mobile-overlay {
+  position: fixed;
+  top: 4rem;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 30;
+}
+
+@media (min-width: 1024px) {
+  .mobile-overlay {
+    display: none;
+  }
+}

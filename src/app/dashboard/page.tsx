@@ -3,9 +3,11 @@
 import ProtectedRoute from '@/components/ProtectedRoute'
 import DashboardLayout from '@/components/DashboardLayout'
 import IssueHeatmap from '@/components/IssueHeatmap'
+import { useAuth } from '@/contexts/AuthContext'
 import { AlertTriangle, Users, CheckCircle, Clock, TrendingUp, MapPin } from 'lucide-react'
 
 export default function DashboardPage() {
+  const { user } = useAuth()
   // Mock data - in a real app, this would come from your API
   const stats = {
     totalIssues: 247,
@@ -110,7 +112,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Heatmap Section */}
-          <IssueHeatmap />
+          <IssueHeatmap adminId={user?.id || ''} />
 
           {/* Recent Issues */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200">

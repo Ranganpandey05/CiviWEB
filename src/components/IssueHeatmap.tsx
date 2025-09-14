@@ -1,604 +1,574 @@
-'use client'
+'use client';
 
-import { useEffect, useRef, useState } from 'react'
-import { Loader } from '@googlemaps/js-api-loader'
-import { MapPin, Users, AlertTriangle, Filter, Maximize2, Navigation, Eye, Phone, Calendar, User, Camera, Globe } from 'lucide-react'
+import React, { useState, useEffect, useRef } from 'react';
+import { GoogleMap, useJsApiLoader, HeatmapLayer, Marker, InfoWindow } from '@react-google-maps/api';
+import { 
+  MapPin, 
+  Zap, 
+  AlertTriangle, 
+  Clock, 
+  Eye, 
+  Users,
+  Activity,
+  Filter,
+  RefreshCw
+} from 'lucide-react';
 
-interface Issue {
-  id: number
-  issueNumber: string
-  title: string
-  description: string
-  category: string
-  priority: 'Low' | 'Medium' | 'High' | 'Urgent'
-  status: 'Reported' | 'Acknowledged' | 'Assigned' | 'In Progress' | 'Completed' | 'Verified'
-  latitude: number
-  longitude: number
-  address: string
-  created: string
-  citizenName: string
-  citizenPhone: string
-  assignedWorker?: string
-  workerId?: string
-  photos: string[]
-  videos?: string[]
-  preciseLocation: boolean
+import {
+  getTasksForHeatmap,
+  getWorkersWithLocation,
+  subscribeToTasks,
+  subscribeToWorkerLocations,
+  Profile,
+  Task,
+  getTasks
+} from '@/lib/adminAPI';
+
+interface HeatmapPoint {
+  lat: number;
+  lng: number;
+  weight: number;
+  status: string;
+  priority: string;
+  title: string;
+  id: string;
 }
 
-interface Worker {
-  id: number
-  workerId: string
-  name: string
-  phone: string
-  latitude: number
-  longitude: number
-  status: 'available' | 'busy' | 'offline'
-  department: string
-  currentAssignments: number
-  rating: number
+interface IssueHeatmapProps {
+  adminId: string;
 }
 
-const IssueHeatmap = () => {
-  const mapRef = useRef<HTMLDivElement>(null)
-  const [map, setMap] = useState<any>(null)
-  const [markers, setMarkers] = useState<any[]>([])
-  const [selectedFilter, setSelectedFilter] = useState<string>('all')
-  const [showWorkers, setShowWorkers] = useState(true)
-  const [isLoading, setIsLoading] = useState(true)
-  const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null)
-  const [language, setLanguage] = useState<'en' | 'hi'>('en')
+export default function IssueHeatmap({ adminId }: IssueHeatmapProps) {
+  const [heatmapData, setHeatmapData] = useState<HeatmapPoint[]>([]);
+  const [workers, setWorkers] = useState<Profile[]>([]);
+  const [selectedIssue, setSelectedIssue] = useState<HeatmapPoint | null>(null);
+  const [selectedWorker, setSelectedWorker] = useState<Profile | null>(null);
+  const [showHeatmap, setShowHeatmap] = useState(true);
+  const [showWorkers, setShowWorkers] = useState(true);
+  const [showIssues, setShowIssues] = useState(true);
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterPriority, setFilterPriority] = useState<string>('all');
+  const [loading, setLoading] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [recentIssues, setRecentIssues] = useState<Task[]>([]);
+  const mapRef = useRef<google.maps.Map | null>(null);
 
-  // Delhi/NCR coordinates as center
-  const DEFAULT_CENTER = { lat: 28.6139, lng: 77.2090 }
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
+    libraries: ['visualization']
+  });
 
-  // Realistic Indian civic issues data
-  const issues: Issue[] = [
-    {
-      id: 1,
-      issueNumber: 'CIV-2024-001',
-      title: 'सड़क में बड़ा गड्ढा',
-      description: 'मुख्य सड़क पर गहरा गड्ढा है जिससे दुर्घटना हो सकती है। बारिश के बाद पानी भर जाता है।',
-      category: 'Road Maintenance',
-      priority: 'High',
-      status: 'Reported',
-      latitude: 28.6139,
-      longitude: 77.2090,
-      address: 'कनॉट प्लेस मुख्य मार्ग, नई दिल्ली',
-      created: '2024-01-15T10:30:00Z',
-      citizenName: 'राज शर्मा',
-      citizenPhone: '+91-9876543210',
-      photos: ['/api/placeholder/400/300', '/api/placeholder/400/300'],
-      preciseLocation: true
-    },
-    {
-      id: 2,
-      issueNumber: 'CIV-2024-002',
-      title: 'स्ट्रीट लाइट बंद है',
-      description: 'रात को अंधेरा रहता है, महिलाओं की सुरक्षा की समस्या है।',
-      category: 'Electrical',
-      priority: 'Medium',
-      status: 'Assigned',
-      latitude: 28.6129,
-      longitude: 77.2295,
-      address: 'इंडिया गेट परिसर, नई दिल्ली',
-      created: '2024-01-14T16:45:00Z',
-      citizenName: 'प्रिया गुप्ता',
-      citizenPhone: '+91-9876543211',
-      assignedWorker: 'राज कुमार',
-      workerId: 'ELEC001',
-      photos: ['/api/placeholder/400/300'],
-      preciseLocation: true
-    },
-    {
-      id: 3,
-      issueNumber: 'CIV-2024-003',
-      title: 'कचरा गाड़ी नहीं आई',
-      description: 'तीन दिन से कचरा गाड़ी नहीं आई, बदबू आ रही है।',
-      category: 'Sanitation',
-      priority: 'Urgent',
-      status: 'In Progress',
-      latitude: 28.6562,
-      longitude: 77.2410,
-      address: 'लाल किला एरिया, चांदनी चौक',
-      created: '2024-01-14T08:20:00Z',
-      citizenName: 'मोहन लाल',
-      citizenPhone: '+91-9876543212',
-      assignedWorker: 'सुनील कुमार',
-      workerId: 'SAN001',
-      photos: ['/api/placeholder/400/300', '/api/placeholder/400/300'],
-      preciseLocation: true
-    },
-    {
-      id: 4,
-      issueNumber: 'CIV-2024-004',
-      title: 'पानी की पाइप फटी',
-      description: 'पानी बर्बाद हो रहा है, सड़क पर भर गया है।',
-      category: 'Water Supply',
-      priority: 'High',
-      status: 'Acknowledged',
-      latitude: 28.5355,
-      longitude: 77.3910,
-      address: 'नोएडा सेक्टर 18, उत्तर प्रदेश',
-      created: '2024-01-13T14:20:00Z',
-      citizenName: 'अमित कुमार',
-      citizenPhone: '+91-9876543213',
-      photos: ['/api/placeholder/400/300'],
-      videos: ['/api/placeholder/video'],
-      preciseLocation: true
-    },
-    {
-      id: 5,
-      issueNumber: 'CIV-2024-005',
-      title: 'पार्क में टूटे झूले',
-      description: 'बच्चों के लिए खतरनाक है, मरम्मत की जरूरत है।',
-      category: 'Parks & Recreation',
-      priority: 'Medium',
-      status: 'Completed',
-      latitude: 28.4595,
-      longitude: 77.0266,
-      address: 'गुड़गांव साइबर सिटी पार्क',
-      created: '2024-01-12T11:30:00Z',
-      citizenName: 'सुनीता देवी',
-      citizenPhone: '+91-9876543214',
-      assignedWorker: 'विकास सिंह',
-      workerId: 'PARK001',
-      photos: ['/api/placeholder/400/300'],
-      preciseLocation: true
+  // Kolkata Sector V center
+  const mapCenter = {
+    lat: 22.5743,
+    lng: 88.4348
+  };
+
+  const mapOptions = {
+    zoom: 13,
+    center: mapCenter,
+    mapTypeId: 'roadmap' as google.maps.MapTypeId,
+    styles: [
+      {
+        featureType: 'poi',
+        elementType: 'labels',
+        stylers: [{ visibility: 'off' }]
+      },
+      {
+        featureType: 'transit',
+        elementType: 'labels',
+        stylers: [{ visibility: 'off' }]
+      }
+    ]
+  };
+
+  useEffect(() => {
+    loadMapData();
+    
+    // Set up real-time subscriptions
+    const tasksSubscription = subscribeToTasks((payload) => {
+      console.log('Real-time task update:', payload);
+      loadMapData();
+      setLastUpdate(new Date());
+    });
+
+    const workersSubscription = subscribeToWorkerLocations((payload) => {
+      console.log('Real-time worker location update:', payload);
+      loadWorkers();
+      setLastUpdate(new Date());
+    });
+
+    return () => {
+      tasksSubscription.unsubscribe();
+      workersSubscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    filterHeatmapData();
+  }, [filterStatus, filterPriority]);
+
+  const loadMapData = async () => {
+    try {
+      setLoading(true);
+      
+      // Load heatmap data
+      const heatmapPoints = await getTasksForHeatmap();
+      setHeatmapData(heatmapPoints);
+      
+      // Load recent issues
+      const tasks = await getTasks();
+      setRecentIssues(tasks.slice(0, 5));
+      
+      // Load workers
+      await loadWorkers();
+      
+    } catch (error) {
+      console.error('Error loading map data:', error);
+    } finally {
+      setLoading(false);
     }
-  ]
+  };
 
-  const workers: Worker[] = [
-    {
-      id: 1,
-      workerId: 'ROAD001',
-      name: 'राम प्रसाद शर्मा',
-      phone: '+91-9988776655',
-      latitude: 28.6140,
-      longitude: 77.2088,
-      status: 'available',
-      department: 'Roads & Infrastructure',
-      currentAssignments: 0,
-      rating: 4.8
-    },
-    {
-      id: 2,
-      workerId: 'ELEC001',
-      name: 'राज कुमार',
-      phone: '+91-9988776656',
-      latitude: 28.6130,
-      longitude: 77.2290,
-      status: 'busy',
-      department: 'Electrical',
-      currentAssignments: 2,
-      rating: 4.6
-    },
-    {
-      id: 3,
-      workerId: 'SAN001',
-      name: 'सुनील कुमार',
-      phone: '+91-9988776657',
-      latitude: 28.5360,
-      longitude: 77.3915,
-      status: 'available',
-      department: 'Sanitation',
-      currentAssignments: 1,
-      rating: 4.9
-    },
-    {
-      id: 4,
-      workerId: 'WATER001',
-      name: 'अशोक यादव',
-      phone: '+91-9988776658',
-      latitude: 28.5400,
-      longitude: 77.3800,
-      status: 'busy',
-      department: 'Water Supply',
-      currentAssignments: 1,
-      rating: 4.7
+  const loadWorkers = async () => {
+    try {
+      const workersData = await getWorkersWithLocation();
+      setWorkers(workersData);
+    } catch (error) {
+      console.error('Error loading workers:', error);
     }
-  ]
+  };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'Urgent': return '#DC2626' // Red-600
-      case 'High': return '#EA580C' // Orange-600  
-      case 'Medium': return '#CA8A04' // Yellow-600
-      case 'Low': return '#16A34A' // Green-600
-      default: return '#6B7280' // Gray-500
-    }
-  }
+  const filterHeatmapData = () => {
+    // Filter is applied in the component render
+  };
+
+  const getFilteredHeatmapData = () => {
+    return heatmapData.filter(point => {
+      if (filterStatus !== 'all' && point.status !== filterStatus) return false;
+      if (filterPriority !== 'all' && point.priority !== filterPriority) return false;
+      return true;
+    });
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Reported': return '#EF4444' // Red
-      case 'Acknowledged': return '#F97316' // Orange
-      case 'Assigned': return '#EAB308' // Yellow
-      case 'In Progress': return '#3B82F6' // Blue
-      case 'Completed': return '#22C55E' // Green
-      case 'Verified': return '#10B981' // Emerald
-      default: return '#6B7280' // Gray
+      case 'pending': return '#f59e0b'; // Amber
+      case 'assigned': return '#3b82f6'; // Blue
+      case 'in_progress': return '#8b5cf6'; // Purple
+      case 'completed': return '#10b981'; // Emerald
+      case 'verified': return '#06b6d4'; // Cyan
+      default: return '#6b7280'; // Gray
     }
-  }
+  };
 
-  const getWorkerStatusColor = (status: string) => {
-    switch (status) {
-      case 'available': return '#22C55E' // Green
-      case 'busy': return '#EAB308' // Yellow
-      case 'offline': return '#6B7280' // Gray
-      default: return '#6B7280'
+  const getPriorityIcon = (priority: string) => {
+    switch (priority) {
+      case 'urgent': return <Zap className="w-4 h-4 text-red-500" />;
+      case 'high': return <AlertTriangle className="w-4 h-4 text-orange-500" />;
+      case 'medium': return <Clock className="w-4 h-4 text-yellow-500" />;
+      case 'low': return <Activity className="w-4 h-4 text-green-500" />;
+      default: return <Activity className="w-4 h-4 text-gray-500" />;
     }
-  }
+  };
 
-  // Initialize Google Maps with Apple Maps style
-  useEffect(() => {
-    const initMap = async () => {
-      if (!mapRef.current) return
-
-      try {
-        const loader = new Loader({
-          apiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
-          version: 'weekly',
-          libraries: ['geometry', 'places']
-        })
-
-        const google = await loader.load()
-        
-        const mapInstance = new google.maps.Map(mapRef.current, {
-          center: DEFAULT_CENTER,
-          zoom: 11,
-          mapTypeId: 'roadmap',
-          styles: [
-            // Apple Maps inspired styling
-            {
-              featureType: 'administrative',
-              elementType: 'labels.text.fill',
-              stylers: [{ color: '#6b7280' }]
-            },
-            {
-              featureType: 'landscape',
-              elementType: 'geometry.fill',
-              stylers: [{ color: '#f3f4f6' }]
-            },
-            {
-              featureType: 'poi',
-              elementType: 'labels',
-              stylers: [{ visibility: 'off' }]
-            },
-            {
-              featureType: 'road',
-              elementType: 'geometry.fill',
-              stylers: [{ color: '#ffffff' }]
-            },
-            {
-              featureType: 'road',
-              elementType: 'geometry.stroke',
-              stylers: [{ color: '#e5e7eb' }]
-            },
-            {
-              featureType: 'road.highway',
-              elementType: 'geometry.fill',
-              stylers: [{ color: '#fef3c7' }]
-            },
-            {
-              featureType: 'transit',
-              elementType: 'labels',
-              stylers: [{ visibility: 'off' }]
-            },
-            {
-              featureType: 'water',
-              elementType: 'geometry.fill',
-              stylers: [{ color: '#dbeafe' }]
-            }
-          ],
-          disableDefaultUI: false,
-          zoomControl: true,
-          mapTypeControl: false,
-          scaleControl: true,
-          streetViewControl: false,
-          rotateControl: false,
-          fullscreenControl: true
-        })
-
-        setMap(mapInstance)
-        setIsLoading(false)
-      } catch (error) {
-        console.error('Error loading Google Maps:', error)
-        setIsLoading(false)
-      }
-    }
-
-    if (process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) {
-      initMap()
+  const getWorkerStatusIcon = (worker: Profile) => {
+    const now = new Date();
+    const lastUpdate = new Date(worker.updated_at);
+    const minutesAgo = (now.getTime() - lastUpdate.getTime()) / (1000 * 60);
+    
+    if (minutesAgo < 5) {
+      return '🟢'; // Green - Active
+    } else if (minutesAgo < 15) {
+      return '🟡'; // Yellow - Recently active
     } else {
-      console.warn('Google Maps API key not found')
-      setIsLoading(false)
+      return '🔴'; // Red - Offline
     }
-  }, [])
+  };
 
-  // Update markers when filter changes
-  useEffect(() => {
-    if (!map) return
+  const filteredData = getFilteredHeatmapData();
 
-    // Clear existing markers
-    markers.forEach(marker => marker.setMap(null))
-    const newMarkers: any[] = []
-
-    // Filter issues
-    const filteredIssues = issues.filter(issue => {
-      if (selectedFilter === 'all') return true
-      if (selectedFilter === 'open') return ['Reported', 'Acknowledged'].includes(issue.status)
-      if (selectedFilter === 'urgent') return issue.priority === 'Urgent'
-      if (selectedFilter === 'high') return issue.priority === 'High'
-      if (selectedFilter === 'assigned') return ['Assigned', 'In Progress'].includes(issue.status)
-      return true
-    })
-
-    // Add issue markers with enhanced info
-    filteredIssues.forEach(issue => {
-      const marker = new google.maps.Marker({
-        position: { lat: issue.latitude, lng: issue.longitude },
-        map: map,
-        title: issue.title,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 10,
-          fillColor: getPriorityColor(issue.priority),
-          fillOpacity: 0.9,
-          strokeColor: '#ffffff',
-          strokeWeight: 3
-        }
-      })
-
-      const infoWindow = new google.maps.InfoWindow({
-        content: `
-          <div class="p-4 max-w-sm">
-            <div class="flex items-start justify-between mb-3">
-              <h3 class="font-bold text-gray-900 text-lg">${issue.title}</h3>
-              <span class="px-2 py-1 rounded-full text-xs font-medium" style="background-color: ${getStatusColor(issue.status)}20; color: ${getStatusColor(issue.status)}">
-                ${issue.status}
-              </span>
-            </div>
-            
-            <div class="space-y-2 text-sm mb-4">
-              <p class="text-gray-700">${issue.description}</p>
-              <div class="flex items-center space-x-4">
-                <span class="flex items-center">
-                  <span class="w-2 h-2 rounded-full mr-2" style="background-color: ${getPriorityColor(issue.priority)}"></span>
-                  ${issue.priority}
-                </span>
-                <span class="text-gray-500">${issue.issueNumber}</span>
-              </div>
-              <p class="text-gray-600">📍 ${issue.address}</p>
-              <p class="text-gray-600">👤 ${issue.citizenName} • 📞 ${issue.citizenPhone}</p>
-              ${issue.assignedWorker ? `<p class="text-blue-600">🔧 Assigned to: ${issue.assignedWorker}</p>` : ''}
-            </div>
-            
-            <div class="flex space-x-2">
-              <button onclick="viewIssueDetails(${issue.id})" class="px-4 py-2 bg-orange-500 text-white text-xs rounded-lg hover:bg-orange-600 transition-colors">
-                View Details
-              </button>
-              ${!issue.assignedWorker ? `<button onclick="assignWorker(${issue.id})" class="px-4 py-2 bg-blue-500 text-white text-xs rounded-lg hover:bg-blue-600 transition-colors">
-                Assign Worker
-              </button>` : ''}
-            </div>
-          </div>
-        `
-      })
-
-      marker.addListener('click', () => {
-        infoWindow.open(map, marker)
-        setSelectedIssue(issue)
-      })
-
-      newMarkers.push(marker)
-    })
-
-    // Add worker markers if enabled
-    if (showWorkers) {
-      workers.forEach(worker => {
-        const marker = new google.maps.Marker({
-          position: { lat: worker.latitude, lng: worker.longitude },
-          map: map,
-          title: worker.name,
-          icon: {
-            path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-            scale: 8,
-            fillColor: getWorkerStatusColor(worker.status),
-            fillOpacity: 0.9,
-            strokeColor: '#ffffff',
-            strokeWeight: 2,
-            rotation: 0
-          }
-        })
-
-        const infoWindow = new google.maps.InfoWindow({
-          content: `
-            <div class="p-4">
-              <h3 class="font-bold text-gray-900 mb-2">${worker.name}</h3>
-              <div class="space-y-2 text-sm">
-                <p><span class="font-medium">ID:</span> ${worker.workerId}</p>
-                <p><span class="font-medium">Department:</span> ${worker.department}</p>
-                <p><span class="font-medium">Phone:</span> ${worker.phone}</p>
-                <div class="flex items-center space-x-2">
-                  <span class="font-medium">Status:</span>
-                  <span class="px-2 py-1 rounded-full text-xs" style="background-color: ${getWorkerStatusColor(worker.status)}20; color: ${getWorkerStatusColor(worker.status)}">
-                    ${worker.status}
-                  </span>
-                </div>
-                <p><span class="font-medium">Current Tasks:</span> ${worker.currentAssignments}</p>
-                <p><span class="font-medium">Rating:</span> ⭐ ${worker.rating}/5</p>
-              </div>
-              <button onclick="contactWorker('${worker.phone}')" class="mt-3 w-full px-4 py-2 bg-green-500 text-white text-xs rounded-lg hover:bg-green-600 transition-colors">
-                Contact Worker
-              </button>
-            </div>
-          `
-        })
-
-        marker.addListener('click', () => {
-          infoWindow.open(map, marker)
-        })
-
-        newMarkers.push(marker)
-      })
-    }
-
-    setMarkers(newMarkers)
-  }, [map, selectedFilter, showWorkers])
-
-  const filteredIssues = issues.filter(issue => {
-    if (selectedFilter === 'all') return true
-    if (selectedFilter === 'open') return ['Reported', 'Acknowledged'].includes(issue.status)
-    if (selectedFilter === 'urgent') return issue.priority === 'Urgent'
-    if (selectedFilter === 'high') return issue.priority === 'High'
-    if (selectedFilter === 'assigned') return ['Assigned', 'In Progress'].includes(issue.status)
-    return true
-  })
+  if (!isLoaded) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <span className="ml-3 text-lg">Loading CiviSamadhan Real-time Map...</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-      <div className="border-b border-gray-100 p-6 bg-gradient-to-r from-orange-50 to-green-50">
-        <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="bg-white p-6 rounded-lg shadow border">
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-xl font-bold text-gray-900">
-              {language === 'hi' ? 'समस्याओं का लाइव मैप' : 'Live Issues Map'}
-            </h3>
-            <p className="text-sm text-gray-600 mt-1">
-              {language === 'hi' 
-                ? 'शहर भर की समस्याओं का रियल-टाइम दृश्य' 
-                : 'Real-time visualization of city-wide issues'}
-            </p>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Real-time Issue Heatmap</h1>
+            <p className="text-gray-600">Live visualization of citizen reports and worker locations</p>
           </div>
-          <div className="flex items-center space-x-3">
-            <select 
-              value={selectedFilter}
-              onChange={(e) => setSelectedFilter(e.target.value)}
-              className="border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white shadow-sm"
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-500">
+              Last updated: {lastUpdate.toLocaleTimeString()}
+            </span>
+            <button
+              onClick={loadMapData}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              disabled={loading}
             >
-              <option value="all">{language === 'hi' ? 'सभी समस्याएं' : 'All Issues'}</option>
-              <option value="open">{language === 'hi' ? 'नई समस्याएं' : 'Open Issues'}</option>
-              <option value="assigned">{language === 'hi' ? 'असाइन की गई' : 'Assigned'}</option>
-              <option value="urgent">{language === 'hi' ? 'तत्काल' : 'Urgent Only'}</option>
-              <option value="high">{language === 'hi' ? 'उच्च प्राथमिकता' : 'High Priority'}</option>
-            </select>
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-blue-600" />
+              <div>
+                <p className="text-sm text-blue-600">Total Issues</p>
+                <p className="text-xl font-bold text-blue-900">{heatmapData.length}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-green-600" />
+              <div>
+                <p className="text-sm text-green-600">Active Workers</p>
+                <p className="text-xl font-bold text-green-900">{workers.length}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+            <div className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-purple-600" />
+              <div>
+                <p className="text-sm text-purple-600">Urgent Issues</p>
+                <p className="text-xl font-bold text-purple-900">
+                  {heatmapData.filter(p => p.priority === 'urgent').length}
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+            <div className="flex items-center gap-2">
+              <Activity className="w-5 h-5 text-orange-600" />
+              <div>
+                <p className="text-sm text-orange-600">In Progress</p>
+                <p className="text-xl font-bold text-orange-900">
+                  {heatmapData.filter(p => p.status === 'in_progress').length}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filters and Controls */}
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-gray-600" />
+            <span className="text-sm font-medium text-gray-700">Filters:</span>
+          </div>
+          
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="all">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="assigned">Assigned</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
+            <option value="verified">Verified</option>
+          </select>
+
+          <select
+            value={filterPriority}
+            onChange={(e) => setFilterPriority(e.target.value)}
+            className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="all">All Priorities</option>
+            <option value="urgent">Urgent</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={showHeatmap}
+                onChange={(e) => setShowHeatmap(e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-700">Heatmap</span>
+            </label>
             
-            <label className="flex items-center text-sm font-medium">
+            <label className="flex items-center gap-2">
               <input
                 type="checkbox"
                 checked={showWorkers}
                 onChange={(e) => setShowWorkers(e.target.checked)}
-                className="mr-2 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                className="rounded border-gray-300 text-green-600 focus:ring-green-500"
               />
-              {language === 'hi' ? 'कर्मचारी दिखाएं' : 'Show Workers'}
+              <span className="text-sm text-gray-700">Workers</span>
             </label>
             
-            <button 
-              onClick={() => setLanguage(language === 'en' ? 'hi' : 'en')}
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
-            >
-              <Globe className="h-4 w-4" />
-            </button>
-            
-            <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
-              <Maximize2 className="h-4 w-4" />
-            </button>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={showIssues}
+                onChange={(e) => setShowIssues(e.target.checked)}
+                className="rounded border-gray-300 text-red-600 focus:ring-red-500"
+              />
+              <span className="text-sm text-gray-700">Issue Markers</span>
+            </label>
           </div>
         </div>
       </div>
 
-      <div className="relative h-[500px]">
-        {isLoading ? (
-          <div className="w-full h-full bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-orange-500 mx-auto mb-4"></div>
-              <p className="text-gray-700 font-medium">
-                {language === 'hi' ? 'मैप लोड हो रहा है...' : 'Loading map...'}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div ref={mapRef} className="w-full h-full rounded-lg" />
-        )}
+      {/* Map and Sidebar */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Map */}
+        <div className="lg:col-span-3">
+          <div className="bg-white rounded-lg shadow border overflow-hidden">
+            <GoogleMap
+              mapContainerStyle={{ width: '100%', height: '600px' }}
+              zoom={mapOptions.zoom}
+              center={mapOptions.center}
+              options={mapOptions}
+              onLoad={(map) => {
+                mapRef.current = map;
+              }}
+            >
+              {/* Heatmap Layer */}
+              {showHeatmap && filteredData.length > 0 && (
+                <HeatmapLayer
+                  data={filteredData.map(point => ({
+                    location: new google.maps.LatLng(point.lat, point.lng),
+                    weight: point.weight
+                  }))}
+                  options={{
+                    radius: 30,
+                    opacity: 0.6,
+                    gradient: [
+                      'rgba(0, 255, 255, 0)',
+                      'rgba(0, 255, 255, 1)',
+                      'rgba(0, 191, 255, 1)',
+                      'rgba(0, 127, 255, 1)',
+                      'rgba(0, 63, 255, 1)',
+                      'rgba(0, 0, 255, 1)',
+                      'rgba(0, 0, 223, 1)',
+                      'rgba(0, 0, 191, 1)',
+                      'rgba(0, 0, 159, 1)',
+                      'rgba(0, 0, 127, 1)',
+                      'rgba(63, 0, 91, 1)',
+                      'rgba(127, 0, 63, 1)',
+                      'rgba(191, 0, 31, 1)',
+                      'rgba(255, 0, 0, 1)'
+                    ]
+                  }}
+                />
+              )}
 
-        {/* Enhanced Legend */}
-        <div className="absolute bottom-4 left-4 bg-white rounded-xl shadow-lg border border-gray-200 p-4 max-w-xs">
-          <h5 className="font-bold text-gray-900 mb-3">
-            {language === 'hi' ? 'संकेतक' : 'Legend'}
-          </h5>
-          <div className="space-y-2">
-            <div className="text-xs font-medium text-gray-700 mb-2">
-              {language === 'hi' ? 'समस्या प्राथमिकता:' : 'Issue Priority:'}
-            </div>
-            <div className="flex items-center text-xs">
-              <div className="w-3 h-3 rounded-full bg-red-600 mr-2"></div>
-              <span>{language === 'hi' ? 'तत्काल' : 'Urgent'}</span>
-            </div>
-            <div className="flex items-center text-xs">
-              <div className="w-3 h-3 rounded-full bg-orange-600 mr-2"></div>
-              <span>{language === 'hi' ? 'उच्च' : 'High'}</span>
-            </div>
-            <div className="flex items-center text-xs">
-              <div className="w-3 h-3 rounded-full bg-yellow-600 mr-2"></div>
-              <span>{language === 'hi' ? 'मध्यम' : 'Medium'}</span>
-            </div>
-            <div className="flex items-center text-xs">
-              <div className="w-3 h-3 rounded-full bg-green-600 mr-2"></div>
-              <span>{language === 'hi' ? 'कम' : 'Low'}</span>
-            </div>
-            {showWorkers && (
-              <>
-                <div className="border-t border-gray-200 pt-2 mt-2">
-                  <div className="text-xs font-medium text-gray-700 mb-2">
-                    {language === 'hi' ? 'कर्मचारी स्थिति:' : 'Worker Status:'}
+              {/* Issue Markers */}
+              {showIssues && filteredData.map((point) => (
+                <Marker
+                  key={point.id}
+                  position={{ lat: point.lat, lng: point.lng }}
+                  icon={{
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 8,
+                    fillColor: getStatusColor(point.status),
+                    fillOpacity: 0.8,
+                    strokeColor: '#ffffff',
+                    strokeWeight: 2
+                  }}
+                  onClick={() => setSelectedIssue(point)}
+                />
+              ))}
+
+              {/* Worker Markers */}
+              {showWorkers && workers.map((worker) => (
+                <Marker
+                  key={worker.id}
+                  position={{ 
+                    lat: worker.current_latitude!, 
+                    lng: worker.current_longitude! 
+                  }}
+                  icon={{
+                    path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                    scale: 6,
+                    fillColor: '#22c55e',
+                    fillOpacity: 1,
+                    strokeColor: '#ffffff',
+                    strokeWeight: 2,
+                    rotation: 0
+                  }}
+                  onClick={() => setSelectedWorker(worker)}
+                />
+              ))}
+
+              {/* Issue Info Window */}
+              {selectedIssue && (
+                <InfoWindow
+                  position={{ lat: selectedIssue.lat, lng: selectedIssue.lng }}
+                  onCloseClick={() => setSelectedIssue(null)}
+                >
+                  <div className="p-3 max-w-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                      {getPriorityIcon(selectedIssue.priority)}
+                      <h3 className="font-semibold text-gray-900">{selectedIssue.title}</h3>
+                    </div>
+                    <div className="space-y-1 text-sm text-gray-600">
+                      <p><span className="font-medium">Status:</span> {selectedIssue.status}</p>
+                      <p><span className="font-medium">Priority:</span> {selectedIssue.priority}</p>
+                      <p><span className="font-medium">Location:</span> {selectedIssue.lat.toFixed(4)}, {selectedIssue.lng.toFixed(4)}</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        // Handle view details
+                        console.log('View issue details:', selectedIssue.id);
+                      }}
+                      className="mt-2 flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm"
+                    >
+                      <Eye className="w-3 h-3" />
+                      View Details
+                    </button>
                   </div>
-                  <div className="flex items-center text-xs">
-                    <Navigation className="w-3 h-3 text-green-600 mr-2" />
-                    <span>{language === 'hi' ? 'उपलब्ध' : 'Available'}</span>
+                </InfoWindow>
+              )}
+
+              {/* Worker Info Window */}
+              {selectedWorker && (
+                <InfoWindow
+                  position={{ 
+                    lat: selectedWorker.current_latitude!, 
+                    lng: selectedWorker.current_longitude! 
+                  }}
+                  onCloseClick={() => setSelectedWorker(null)}
+                >
+                  <div className="p-3 max-w-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-lg">{getWorkerStatusIcon(selectedWorker)}</span>
+                      <h3 className="font-semibold text-gray-900">{selectedWorker.full_name}</h3>
+                    </div>
+                    <div className="space-y-1 text-sm text-gray-600">
+                      <p><span className="font-medium">Department:</span> {selectedWorker.department}</p>
+                      <p><span className="font-medium">Speciality:</span> {selectedWorker.speciality}</p>
+                      <p><span className="font-medium">Last Update:</span> {new Date(selectedWorker.updated_at).toLocaleTimeString()}</p>
+                    </div>
                   </div>
-                  <div className="flex items-center text-xs">
-                    <Navigation className="w-3 h-3 text-yellow-600 mr-2" />
-                    <span>{language === 'hi' ? 'व्यस्त' : 'Busy'}</span>
-                  </div>
-                </div>
-              </>
-            )}
+                </InfoWindow>
+              )}
+            </GoogleMap>
           </div>
         </div>
 
-        {/* Enhanced Stats overlay */}
-        <div className="absolute top-4 right-4 bg-white rounded-xl shadow-lg border border-gray-200 p-4">
-          <div className="grid grid-cols-2 gap-4 text-center">
-            <div>
-              <div className="text-2xl font-bold text-red-600">
-                {issues.filter(i => ['Reported', 'Acknowledged'].includes(i.status)).length}
-              </div>
-              <div className="text-xs text-gray-500">
-                {language === 'hi' ? 'नई समस्याएं' : 'Open Issues'}
-              </div>
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* Recent Issues */}
+          <div className="bg-white rounded-lg shadow border">
+            <div className="p-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Recent Issues</h3>
             </div>
-            <div>
-              <div className="text-2xl font-bold text-green-600">
-                {workers.filter(w => w.status === 'available').length}
-              </div>
-              <div className="text-xs text-gray-500">
-                {language === 'hi' ? 'उपलब्ध कर्मचारी' : 'Available Workers'}
-              </div>
+            <div className="p-4 space-y-3">
+              {recentIssues.map((issue) => (
+                <div key={issue.id} className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
+                  <div className="flex items-start gap-2">
+                    {getPriorityIcon(issue.priority)}
+                    <div className="flex-1">
+                      <h4 className="font-medium text-sm text-gray-900 mb-1">{issue.title}</h4>
+                      <p className="text-xs text-gray-600 mb-2">{issue.description.substring(0, 60)}...</p>
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className={`px-2 py-1 rounded-full bg-gray-100 text-gray-800`}>
+                          {issue.status}
+                        </span>
+                        <span className="text-gray-500">
+                          {new Date(issue.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-          <div className="mt-3 pt-3 border-t border-gray-200">
-            <div className="text-center">
-              <div className="text-lg font-bold text-blue-600">
-                {issues.filter(i => ['Assigned', 'In Progress'].includes(i.status)).length}
+
+          {/* Active Workers */}
+          <div className="bg-white rounded-lg shadow border">
+            <div className="p-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Active Workers</h3>
+            </div>
+            <div className="p-4 space-y-3">
+              {workers.slice(0, 5).map((worker) => (
+                <div key={worker.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50">
+                  <span className="text-lg">{getWorkerStatusIcon(worker)}</span>
+                  <div className="flex-1">
+                    <h4 className="font-medium text-sm text-gray-900">{worker.full_name}</h4>
+                    <p className="text-xs text-gray-600">{worker.department}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Legend */}
+          <div className="bg-white rounded-lg shadow border">
+            <div className="p-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Legend</h3>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <h4 className="font-medium text-sm text-gray-900 mb-2">Issue Status</h4>
+                <div className="space-y-1">
+                  {[
+                    { status: 'pending', color: '#f59e0b', label: 'Pending' },
+                    { status: 'assigned', color: '#3b82f6', label: 'Assigned' },
+                    { status: 'in_progress', color: '#8b5cf6', label: 'In Progress' },
+                    { status: 'completed', color: '#10b981', label: 'Completed' },
+                    { status: 'verified', color: '#06b6d4', label: 'Verified' }
+                  ].map(({ status, color, label }) => (
+                    <div key={status} className="flex items-center gap-2">
+                      <div 
+                        className="w-3 h-3 rounded-full border border-white" 
+                        style={{ backgroundColor: color }}
+                      ></div>
+                      <span className="text-xs text-gray-600">{label}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="text-xs text-gray-500">
-                {language === 'hi' ? 'प्रगति में' : 'In Progress'}
+              
+              <div>
+                <h4 className="font-medium text-sm text-gray-900 mb-2">Worker Status</h4>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span>🟢</span>
+                    <span className="text-xs text-gray-600">Active (&lt; 5 min)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span>🟡</span>
+                    <span className="text-xs text-gray-600">Recent (&lt; 15 min)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span>🔴</span>
+                    <span className="text-xs text-gray-600">Offline (&gt; 15 min)</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }
-
-export default IssueHeatmap

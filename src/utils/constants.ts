@@ -1,11 +1,11 @@
 export const API_ENDPOINTS = {
     GET_REPORTS: '/api/reports',
-    GET_REPORT_DETAILS: (id) => `/api/reports/${id}`,
+    GET_REPORT_DETAILS: (id: string | number) => `/api/reports/${id}`,
     CREATE_REPORT: '/api/reports',
-    UPDATE_REPORT: (id) => `/api/reports/${id}`,
-    DELETE_REPORT: (id) => `/api/reports/${id}`,
+    UPDATE_REPORT: (id: string | number) => `/api/reports/${id}`,
+    DELETE_REPORT: (id: string | number) => `/api/reports/${id}`,
     GET_WORKERS: '/api/workers',
-    GET_WORKER_DETAILS: (id) => `/api/workers/${id}`,
+    GET_WORKER_DETAILS: (id: string | number) => `/api/workers/${id}`,
     ASSIGN_WORKER: '/api/assignments',
 };
 

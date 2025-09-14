@@ -6,40 +6,52 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/dashboard/page": [
+    "/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/page.js"
+      "static/css/app/page.css",
+      "static/chunks/app/page.js"
     ],
     "/login/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/login/page.js"
     ],
-    "/dashboard/reports/page": [
+    "/reports/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/reports/page.js"
+      "static/css/app/reports/page.css",
+      "static/chunks/app/reports/page.js"
     ],
-    "/dashboard/workers/page": [
+    "/applications/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/workers/page.js"
+      "static/css/app/applications/page.css",
+      "static/chunks/app/applications/page.js"
     ],
-    "/dashboard/worker-onboarding/page": [
+    "/workers/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/worker-onboarding/page.js"
+      "static/css/app/workers/page.css",
+      "static/chunks/app/workers/page.js"
     ],
-    "/dashboard/analytics/page": [
+    "/heatmap/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/analytics/page.js"
+      "static/css/app/heatmap/page.css",
+      "static/chunks/app/heatmap/page.js"
     ],
-    "/dashboard/settings/page": [
+    "/analytics/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/settings/page.js"
+      "static/css/app/analytics/page.css",
+      "static/chunks/app/analytics/page.js"
+    ],
+    "/messages/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/messages/page.css",
+      "static/chunks/app/messages/page.js"
     ]
   }
 }

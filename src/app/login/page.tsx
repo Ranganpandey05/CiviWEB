@@ -4,8 +4,10 @@ import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, Shield } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 export default function LoginPage() {
+  const { t } = useTranslation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -20,12 +22,18 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
+    console.log('Login attempt with email:', email)
+    
     const { error } = await signIn(email, password)
     
+    console.log('Sign in result:', { error })
+    
     if (error) {
+      console.error('Login error:', error)
       setError(error)
     } else {
-      router.push('/dashboard')
+      console.log('Login successful, redirecting...')
+      router.push('/')
     }
     
     setLoading(false)
@@ -42,7 +50,7 @@ export default function LoginPage() {
             CiviSamadhan
           </h2>
           <p className="mt-2 text-lg text-orange-600 font-medium">
-            नगर प्रशासन डैशबोर्ड
+            {t('adminDashboard')}
           </p>
           <p className="mt-1 text-sm text-gray-600">
             Digital platform for smart city management
@@ -53,7 +61,20 @@ export default function LoginPage() {
           <div className="bg-white p-8 rounded-lg shadow-md space-y-4">
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-                {error}
+                <p>{error}</p>
+                {error.includes('Invalid login credentials') && (
+                  <div className="mt-2 text-xs text-red-600">
+                    <p>Make sure you have:</p>
+                    <ol className="list-decimal list-inside mt-1">
+                      <li>Created an admin user in Supabase Dashboard</li>
+                      <li>Run the ADMIN_SETUP.sql script</li>
+                      <li>Used the correct email and password</li>
+                    </ol>
+                    <p className="mt-2">
+                      Default admin credentials: admin@cvsamadhan.com / admin123
+                    </p>
+                  </div>
+                )}
               </div>
             )}
             

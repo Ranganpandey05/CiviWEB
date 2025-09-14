@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { useLanguage } from '@/contexts/LanguageContext'
 import {
   LayoutDashboard,
   AlertTriangle,
@@ -17,24 +18,24 @@ import {
   Globe
 } from 'lucide-react'
 
-const navigation = [
-  { name: 'Dashboard', nameHi: 'डैशबोर्ड', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Issues & Reports', nameHi: 'समस्याएं और रिपोर्ट', href: '/dashboard/reports', icon: AlertTriangle },
-  { name: 'Workers', nameHi: 'कर्मचारी', href: '/dashboard/workers', icon: Users },
-  { name: 'Worker Onboarding', nameHi: 'कर्मचारी भर्ती', href: '/dashboard/worker-onboarding', icon: UserPlus },
-  { name: 'Analytics', nameHi: 'विश्लेषण', href: '/dashboard/analytics', icon: BarChart3 },
-  { name: 'Settings', nameHi: 'सेटिंग्स', href: '/dashboard/settings', icon: Settings },
-]
-
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [language, setLanguage] = useState<'en' | 'hi'>('en')
   const pathname = usePathname()
   const { user, signOut } = useAuth()
+  const { language, setLanguage, t } = useLanguage()
+
+  const navigation = [
+    { name: 'dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'reports', href: '/dashboard/reports', icon: AlertTriangle },
+    { name: 'workers', href: '/dashboard/workers', icon: Users },
+    { name: 'Worker Onboarding', href: '/dashboard/worker-onboarding', icon: UserPlus },
+    { name: 'analytics', href: '/dashboard/analytics', icon: BarChart3 },
+    { name: 'settings', href: '/dashboard/settings', icon: Settings },
+  ]
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -58,7 +59,7 @@ export default function DashboardLayout({
               </div>
               <div>
                 <h1 className="text-xl font-bold text-white">CiviSamadhan</h1>
-                <p className="text-sm text-orange-100">नगर प्रशासन सेवा</p>
+                <p className="text-sm text-orange-100">{t('cityManagement')}</p>
               </div>
             </div>
             <button
@@ -87,7 +88,7 @@ export default function DashboardLayout({
                   }`}
                 >
                   <Icon className="mr-3 h-5 w-5" />
-                  <span>{language === 'hi' ? item.nameHi : item.name}</span>
+                  <span>{t(item.name)}</span>
                 </Link>
               )
             })}
@@ -100,7 +101,7 @@ export default function DashboardLayout({
               className="flex items-center w-full px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg transition-colors"
             >
               <Globe className="mr-3 h-4 w-4" />
-              {language === 'en' ? 'हिंदी में बदलें' : 'Switch to English'}
+              {t('language')}
             </button>
           </div>
 
@@ -115,7 +116,7 @@ export default function DashboardLayout({
               <div className="ml-3 flex-1">
                 <p className="text-sm font-medium text-gray-900 truncate">{user?.email}</p>
                 <p className="text-xs text-gray-500 capitalize">
-                  {user?.role === 'admin' ? (language === 'hi' ? 'प्रशासक' : 'Administrator') : user?.role}
+                  {user?.role === 'admin' ? t('admin') : user?.role}
                 </p>
               </div>
             </div>
@@ -124,7 +125,7 @@ export default function DashboardLayout({
               className="flex items-center w-full px-4 py-2 text-sm text-gray-600 hover:bg-red-50 hover:text-red-700 rounded-lg transition-colors"
             >
               <LogOut className="mr-3 h-4 w-4" />
-              {language === 'hi' ? 'लॉग आउट' : 'Sign out'}
+              {t('logout')}
             </button>
           </div>
         </div>
@@ -145,17 +146,17 @@ export default function DashboardLayout({
               
               <div className="hidden md:block">
                 <h2 className="text-lg font-semibold text-gray-900">
-                  {language === 'hi' ? 'नगरीय प्रबंधन' : 'Municipal Management'}
+                  {t('cityManagement')}
                 </h2>
                 <p className="text-sm text-gray-500">
-                  {language === 'hi' ? 'रियल-टाइम शहरी सेवा प्रबंधन' : 'Real-time civic service management'}
+                  {t('realTimeManagement')}
                 </p>
               </div>
             </div>
             
             <div className="flex items-center space-x-4">
               <div className="text-sm text-gray-500">
-                {language === 'hi' ? 'अंतिम अपडेट:' : 'Last updated:'} {new Date().toLocaleTimeString()}
+                {t('lastUpdated')}: {new Date().toLocaleTimeString()}
               </div>
               <div className="h-8 w-8 rounded-full bg-green-500 flex items-center justify-center">
                 <div className="h-2 w-2 bg-white rounded-full animate-pulse"></div>
